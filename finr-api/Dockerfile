@@ -11,7 +11,14 @@
 # rapide et reproductible.
 
 # ── Étape 1 : dépendances PHP (vendor/) ─────────────────────────────────────
-FROM composer:2.8 AS vendor
+# L'étape est sur php:8.2-cli et NON sur composer:2.8 : l'image composer
+# embarque PHP 8.4, et le lock est lié à PHP ~8.1||~8.2 (lcobucci/clock).
+# Résoudre le lock sous un autre PHP fait échouer le build alors que le
+# runtime, lui, est bien en 8.2. Seul le binaire composer est emprunte
+# a l'image officielle.
+FROM php:8.2-cli-bookworm AS vendor
+
+COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
@@ -30,7 +37,10 @@ RUN composer install \
 # ── Étape 2 : autoloader optimisé ────────────────────────────────────────────
 # On refait l'autoloader APRÈS avoir copié le code applicatif pour produire un
 # classmap complet (recherche par classe au lieu de lecture fichier à la volée).
-FROM composer:2.8 AS autoloader
+# Même base PHP que l'étape vendor, pour la même raison.
+FROM php:8.2-cli-bookworm AS autoloader
+
+COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
