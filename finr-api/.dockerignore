@@ -1,0 +1,42 @@
+# FIN-R API — contexte de construction Docker
+#
+# Objectif : ne jamais envoyer au daemon ni un secret, ni un gigabyte inutile.
+# Les dépendances sont réinstallées dans l'image (cf. Dockerfile), donc les
+# répertoires locaux de développement n'ont rien à y faire.
+
+# ── Secrets ─────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Dépendances réinstallées par l'image ───────────────────────────────────
+vendor/
+node_modules/
+package-lock.json
+
+# ── Outillage de développement ─────────────────────────────────────────────
+tests/
+.phpunit.cache/
+.php-cs-fixer.cache
+docker-compose*.yml
+compose*.yml
+
+# ── Fichiers de travail ────────────────────────────────────────────────────
+*.log
+*.tmp
+*.zip
+*.zip~
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*.php
+database/*.sqlite
+database/*.sqlite-journal
+
+# ── Divers ─────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+README.md

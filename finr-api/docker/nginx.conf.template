@@ -1,0 +1,73 @@
+# FIN-R API — configuration nginx
+#
+# Ce fichier est un GABARIT : ${PORT} est substitué par envsubst au démarrage
+# (cf. docker/entrypoint.sh). Les variables nginx ($uri, $fastcgi_script_name)
+# doivent survivre : envsubst est donc appelé avec la liste '${PORT}' uniquement.
+
+server {
+    listen      ${PORT};
+    listen      [::]:${PORT};
+    server_name _;
+
+    # Le document root est /public : c'est le seul repertoire expose de Laravel.
+    root  /var/www/html/public;
+    index index.php;
+
+    # Les exports PDF peuvent peser plusieurs Mo.
+    client_max_body_size 12M;
+
+    # Les logs partent sur stdout/stderr, donc dans les logs Render.
+    access_log /dev/stdout;
+    error_log  /dev/stderr warn;
+
+    # ── En-tetes de securite ───────────────────────────────────────────────
+    # Render termine deja TLS et gere la redirection HTTP->HTTPS.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # ── Rendu PDF (dompdf) ──────────────────────────────────────────────────
+    location ~* \.pdf$ {
+        types { }
+        default_type application/pdf;
+        add_header Content-Disposition "inline";
+        add_header Cache-Control "private, max-age=0, must-revalidate";
+    }
+
+    # ── Fichiers statiques ──────────────────────────────────────────────────
+    location ~* \.(?:css|js|jpg|jpeg|gif|png|ico|svg|webp|woff2?|ttf|eot)$ {
+        expires 7d;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # ── Routage Laravel ─────────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # ── Passerelle PHP ──────────────────────────────────────────────────────
+    location ~ \.php$ {
+        try_files $uri =404;
+
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+
+        # $realpath_root resout le symlink /var/www/html/public : sans cela,
+        # SCRIPT_FILENAME pointe vers un chemin que php-fpm ne voit pas et
+        # Laravel rend une page blanche.
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT   $realpath_root;
+
+        # L'export PDF et l'appel au microservice NLP peuvent exceder 60 s.
+        fastcgi_read_timeout  120s;
+        fastcgi_send_timeout  120s;
+        fastcgi_buffering     off;
+    }
+
+    # Tout fichier cache (invisible) est refuse, sauf .well-known (certificats).
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
