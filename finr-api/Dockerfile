@@ -20,6 +20,15 @@ FROM php:8.2-cli-bookworm AS vendor
 
 COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
+# unzip : sans lui (ni extension zip), Composer ne peut pas extraire les
+#         zipballs et bascule tout le lock en source.
+# git    : rend ce repli source réellement possible au lieu de faire echouer
+#         le build sur "git was not found in your PATH".
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends git unzip; \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Le lock seul suffit à résoudre les versions : on copie avant le code source
@@ -43,7 +52,6 @@ FROM php:8.2-cli-bookworm AS autoloader
 COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
-
 COPY --from=vendor /app/vendor ./vendor
 COPY composer.json composer.lock ./
 COPY app ./app
