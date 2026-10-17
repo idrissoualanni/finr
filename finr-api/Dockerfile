@@ -68,12 +68,20 @@ RUN composer dump-autoload \
 # ── Étape 3 : runtime nginx + php-fpm ────────────────────────────────────────
 FROM php:8.2-fpm-bookworm
 
-# Paquets de build (entêtes) puis librairies runtime (liens).
+# Paquets de build. PAS de purge --auto-remove ensuite : les bibliothèques
+# partagées que ces extensions lient (libpq5, libzip4, libicu, libcurl4,
+# libonig5, libpng…) sont installées comme dépendances "auto" des paquets -dev,
+# donc un purge les emporterait. L'image se construirait puis le conteneur
+# mourrait au premier import sur un "symbol lookup error". Le cout est une
+# image plus volumineuse ; l'economie n'en vaut pas le risque.
+# libpq-dev est obligatoire : sans pg_config ni libpq-fe.h, pdo_pgsql ne
+# compile pas.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         nginx \
         gettext-base \
+        libpq-dev \
         libzip-dev \
         libpng-dev \
         libjpeg62-turbo-dev \
@@ -99,9 +107,6 @@ RUN set -eux; \
         intl \
         opcache \
         pcntl; \
-    apt-get purge -y --auto-remove \
-        libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
-        libicu-dev libxml2-dev libcurl4-openssl-dev libonig-dev zlib1g-dev; \
     rm -rf /var/lib/apt/lists/*
 
 COPY docker/php-production.ini /usr/local/etc/php/conf.d/zz-production.ini
