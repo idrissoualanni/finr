@@ -93,13 +93,25 @@ class AuthController extends Controller
      * GET /api/me/current-session
      * Retourne la session active la plus récente de l'ingénieur connecté.
      * Utilisé pour rediriger l'ingénieur vers SON espace de travail après login.
+     *
+     * Contrat : toujours 200. L'absence de session est un ETAT NORMAL (un
+     * ingénieur attend qu'un chercheur lui en assigne une), pas une ressource
+     * absente. Un 404 ici faisait echouer la requete dans la console du
+     * navigateur et confondait trois situations tres differentes : profil
+     * manquant, aucune session assignee, et vraie panne.
+     *
+     * @return JsonResponse {"id": int|null, "reason": string|null}
      */
     public function currentSession(): JsonResponse
     {
         $user = auth()->user();
 
-        if (!$user->isEngineer() || !$user->engineer) {
-            return response()->json(['message' => "Aucun profil ingénieur associé."], 404);
+        if (!$user->isEngineer()) {
+            return response()->json(['id' => null, 'reason' => 'not_an_engineer']);
+        }
+
+        if (!$user->engineer) {
+            return response()->json(['id' => null, 'reason' => 'no_profile']);
         }
 
         $session = $user->engineer->sessions()
@@ -108,10 +120,10 @@ class AuthController extends Controller
             ->first();
 
         if (!$session) {
-            return response()->json(['message' => "Aucune session en cours."], 404);
+            return response()->json(['id' => null, 'reason' => 'no_session']);
         }
 
-        return response()->json(['id' => $session->id]);
+        return response()->json(['id' => $session->id, 'reason' => null]);
     }
 
     private function userResource(User $user): array

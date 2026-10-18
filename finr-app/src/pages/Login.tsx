@@ -16,14 +16,28 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // L'API renvoie TOUJOURS 200 sur /me/current-session, avec id=null quand
+  // aucune session n'est assignee (voir AuthController::currentSession).
+  // Le 404 d'avant était une erreur de contrat : il s'affichait dans la console
+  // et confondait "pas de session" avec une vraie panne.
+  const NO_SESSION_MESSAGE: Record<string, string> = {
+    no_profile: "Votre profil ingénieur n'a pas été créé. Reconnectez-vous pour le générer.",
+    no_session: "Aucune session en cours ne vous a été assignée. Contactez votre chercheur référent.",
+    not_an_engineer: "Ce compte n'est pas un compte ingénieur.",
+  };
+
   const redirectEngineer = async () => {
     try {
       const { data } = await api.get('/me/current-session');
-      navigate(`/workspace/${data.id}`);
+      if (data?.id) {
+        navigate(`/workspace/${data.id}`);
+        return;
+      }
+      setError(NO_SESSION_MESSAGE[data?.reason] ?? NO_SESSION_MESSAGE.no_session);
     } catch {
-      setError("Aucune session en cours ne vous a été assignée. Contactez votre chercheur référent.");
-      setSubmitting(false);
+      setError("Impossible de vérifier vos sessions. Réessayez dans un instant.");
     }
+    setSubmitting(false);
   };
 
   useEffect(() => {
